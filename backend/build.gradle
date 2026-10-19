@@ -1,0 +1,23 @@
+plugins {
+    id("org.sonarqube") version "5.1.0.4882" // This version works for you
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "flexr_flexr-sonarcloud"
+        property "sonar.organization", "flexr"
+        property "sonar.host.url", "https://sonarcloud.io"
+        property "sonar.token", "change-me-to-a-long-random-secret-of-at-least-32-bytes" // Your token
+
+        // Let SonarQube discover sources and binaries from subprojects.
+        // Do NOT set sonar.sources or sonar.java.binaries here for a multi-module project
+        // if you want per-module defaults with overrides.
+
+        // Specify which files to INCLUDE in the analysis.
+        // These paths are relative to the root project directory.
+        property "sonar.inclusions", "auth/src/main/java/flexr/auth/business/managers/**/*.java,flex/src/main/java/flexr/flex/business/managers/**/*.java"
+
+        // This remains for JaCoCo reports from all modules
+        property "sonar.coverage.jacoco.xmlReportPaths", fileTree(dir: '.', include: '**/build/reports/jacoco/test/jacocoTestReport.xml').files.join(',')
+    }
+}

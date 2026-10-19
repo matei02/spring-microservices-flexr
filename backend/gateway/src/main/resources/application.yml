@@ -1,0 +1,41 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://your-tenant.eu.auth0.com/
+          jwk-set-uri: https://your-tenant.eu.auth0.com/.well-known/jwks.json
+  application:
+    name: gateway-service
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lowerCaseServiceId: true
+      routes:
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/auth/**
+          filters:
+            - StripPrefix=1
+        - id: flex-service
+          uri: lb://FLEX-SERVICE
+          predicates:
+            - Path=/flex/**
+          filters:
+            - StripPrefix=1
+eureka:
+  instance:
+    preferIpAddress: true
+    instanceId: ${spring.application.name}:${spring.cloud.client.ip-address}:${server.port}
+    leaseRenewalIntervalInSeconds: 65
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+
+server:
+  port: ${PORT:8080}

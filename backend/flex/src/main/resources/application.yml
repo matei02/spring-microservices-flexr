@@ -1,0 +1,28 @@
+# Define the application name - this is how it will register in Eureka
+
+spring: # or validate/create-drop as you need
+  datasource:
+#      url: ${SPRING_DATASOURCE_URL}
+#      username: ${SPRING_DATASOURCE_USERNAME}
+#      password: ${SPRING_DATASOURCE_PASSWORD}
+      url: jdbc:postgresql://localhost:5432/postgres
+      username: postgres
+      password: change-me-to-a-long-random-secret-of-at-least-32-bytes
+  application:
+    name: flex-service
+
+# Run this client on a different port than the server
+server:
+  port: ${PORT:8082} # Or any other available port (e.g., 8081 like your auth service)
+
+# Configuration specific to Eureka client behaviour
+eureka:
+  instance:
+    preferIpAddress: true
+    instanceId: ${spring.application.name}:${spring.cloud.client.ip-address}:${server.port}
+    leaseRenewalIntervalInSeconds: 30
+  client:
+    registerWithEureka: true
+    fetchRegistry: true
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}

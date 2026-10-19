@@ -1,0 +1,199 @@
+############################
+#  FLEXR ─ BACKEND CI/CD   #
+############################
+
+before_script:
+  - echo "Setting up environment variables...!!!!!"
+
+stages:
+  - build
+  - dockerize
+  - deploy
+
+# Run pipeline only on main
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# --------------------------------------------------------------------
+# Global variables (edit if you fork to another project / region)
+# --------------------------------------------------------------------
+variables:
+  CLOUDSDK_CORE_PROJECT: "woven-justice-453608-r8"
+  REGISTRY: europe-west1-docker.pkg.dev/woven-justice-453608-r8/flexr-repo
+  DOCKER_HOST: tcp://docker:2375/
+  DOCKER_TLS_CERTDIR: ""
+
+
+# --------------------------------------------------------------------
+# Base template: Docker-in-Docker + gcloud auth every job
+# --------------------------------------------------------------------
+.gcloud-job:
+  image: google/cloud-sdk:latest
+  services:
+    - docker:dind
+  before_script:
+    - gcloud auth activate-service-account --key-file="$GCLOUD_SERVICE_KEY"
+    - gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+
+# =======================================================
+# BUILD STAGE (Gradle compiles → JAR artifacts per svc)
+# =======================================================
+.build-gradle: &build-gradle
+  stage: build
+  image: gradle:7.6-jdk17
+  script:
+    - ./gradlew $GRADLE_TARGET --no-daemon
+  artifacts:
+    paths: [$JAR_PATH]
+    expire_in: 1 day
+
+build-eureka:
+  <<: *build-gradle
+  variables:
+    GRADLE_TARGET: ":eureka:bootJar"
+    JAR_PATH: "eureka/build/libs/*.jar"
+
+build-auth:
+  <<: *build-gradle
+  variables:
+    GRADLE_TARGET: ":auth:bootJar"
+    JAR_PATH: "auth/build/libs/*.jar"
+
+build-flex:
+  <<: *build-gradle
+  variables:
+    GRADLE_TARGET: ":flex:bootJar"
+    JAR_PATH: "flex/build/libs/*.jar"
+
+build-gateway:
+  <<: *build-gradle
+  variables:
+    GRADLE_TARGET: ":gateway:bootJar"
+    JAR_PATH: "gateway/build/libs/*.jar"
+
+# --------------------------------------------------------------------
+# TEST STAGE (run tests for each service)
+# --------------------------------------------------------------------
+.test-gradle: &test-gradle
+  stage: build # Tests are part of the build stage
+  image: gradle:7.6-jdk17
+  script:
+    - ./gradlew $GRADLE_TARGET --no-daemon
+  artifacts:
+    paths:
+      - "$TEST_REPORT_PATH" # Path for JUnit HTML reports
+      - "$JACOCO_REPORT_PATH" # Path for JaCoCo XML reports
+    expire_in: 1 day
+    when: always # Collect reports even if tests fail
+
+test-auth:
+  <<: *test-gradle
+  variables:
+    GRADLE_TARGET: ":auth:test"
+    TEST_REPORT_PATH: "auth/build/reports/tests/test"
+    JACOCO_REPORT_PATH: "auth/build/reports/jacoco/test"
+
+test-flex:
+  <<: *test-gradle
+  variables:
+    GRADLE_TARGET: ":flex:test"
+    TEST_REPORT_PATH: "flex/build/reports/tests/test"
+    JACOCO_REPORT_PATH: "flex/build/reports/jacoco/test"
+
+# =======================================================
+# DOCKERIZE STAGE (build image → push to Artifact Reg.)
+# =======================================================
+.dockerize-template: &dockerize
+  extends: .gcloud-job
+  stage: dockerize
+  script:
+    - docker build -t "$REGISTRY/$SERVICE:$CI_COMMIT_SHA" -f "$SERVICE/Dockerfile" "$SERVICE"
+    - docker push "$REGISTRY/$SERVICE:$CI_COMMIT_SHA"
+
+
+dockerize-eureka:
+  <<: *dockerize
+  needs: [build-eureka]
+  variables:
+    SERVICE: eureka
+
+dockerize-auth:
+  <<: *dockerize
+  needs: [build-auth]
+  variables:
+    SERVICE: auth
+
+dockerize-flex:
+  <<: *dockerize
+  needs: [build-flex]
+  variables:
+    SERVICE: flex
+
+dockerize-gateway:
+  <<: *dockerize
+  needs: [build-gateway]
+  variables:
+    SERVICE: gateway
+
+# =======================================================
+# DEPLOY STAGE (Cloud Run, ordered: eureka → auth → flex → gateway)
+# =======================================================
+.deploy-template: &deploy
+  extends: .gcloud-job
+  stage: deploy
+
+# --- 1) Eureka -------------------------------------------------------
+deploy-eureka:
+  <<: *deploy
+  needs: [dockerize-eureka]
+  script: |
+    gcloud run deploy flexr-eureka \
+      --image $REGISTRY/eureka:$CI_COMMIT_SHA \
+      --region europe-west1 --platform managed \
+      --port 8761 --allow-unauthenticated
+    EUREKA_URL=$(gcloud run services describe flexr-eureka \
+      --platform managed --region europe-west1 \
+      --format='value(status.url)')
+    echo "EUREKA_URL=$EUREKA_URL" >> deploy.env
+  artifacts:
+    reports:
+      dotenv: deploy.env
+
+# --- 2) Auth ----------------------------------------------------------
+deploy-auth:
+  <<: *deploy
+  needs: [deploy-eureka, dockerize-auth]
+  dependencies: [deploy-eureka]
+  script: |
+    gcloud run deploy flexr-auth \
+      --image $REGISTRY/auth:$CI_COMMIT_SHA \
+      --region europe-west1 --platform managed \
+      --port 8081 --allow-unauthenticated \
+      --set-env-vars "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_URL}/eureka/,SPRING_DATASOURCE_URL=$SPRING_DATASOURCE_URL,SPRING_DATASOURCE_USERNAME=$SPRING_DATASOURCE_USERNAME,SPRING_DATASOURCE_PASSWORD=$SPRING_DATASOURCE_PASSWORD"
+
+# --- 3) Flex ----------------------------------------------------------
+deploy-flex:
+  <<: *deploy
+  needs: [deploy-auth, dockerize-flex, deploy-eureka]
+  dependencies: [deploy-eureka]
+  script: |
+    gcloud run deploy flexr-flex \
+      --image $REGISTRY/flex:$CI_COMMIT_SHA \
+      --region europe-west1 --platform managed \
+      --port 8082 --allow-unauthenticated \
+      --set-env-vars "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_URL}/eureka/,SPRING_DATASOURCE_URL=$SPRING_DATASOURCE_URL,SPRING_DATASOURCE_USERNAME=$SPRING_DATASOURCE_USERNAME,SPRING_DATASOURCE_PASSWORD=$SPRING_DATASOURCE_PASSWORD"
+
+# --- 4) Gateway -------------------------------------------------------
+deploy-gateway:
+  <<: *deploy
+  needs: [deploy-flex, dockerize-gateway, deploy-eureka]
+  dependencies: [deploy-eureka]
+  script: |
+    gcloud run deploy flexr-gateway \
+      --image $REGISTRY/gateway:$CI_COMMIT_SHA \
+      --region europe-west1 --platform managed \
+      --port 8080 --allow-unauthenticated \
+      --set-env-vars "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_URL}/eureka/"
+

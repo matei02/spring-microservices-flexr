@@ -1,0 +1,65 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.1.8' // Match your version
+    id 'io.spring.dependency-management' version '1.1.4' // Match your version
+    id 'jacoco'
+}
+
+group = 'flexr'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17) // Match your version
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    // Consistent Spring Cloud version matching the BOM
+    set('springCloudVersion', "2022.0.4")
+}
+
+dependencies {
+    // Required for basic web capabilities (e.g., a simple REST endpoint)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // The ONLY Spring Cloud dependency needed for a basic Eureka client
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.postgresql:postgresql:42.7.2' // or latest stable
+
+    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok'
+
+    // Optional: For development convenience
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Standard testing dependency
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // OPTIONAL but recommended: H2 in-memory DB for test environments
+    testRuntimeOnly 'com.h2database:h2'
+}
+
+dependencyManagement {
+    imports {
+        // Import the Spring Cloud BOM to manage dependency versions
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}

@@ -1,0 +1,10 @@
+rootProject.name = 'flexr'
+include 'auth'
+include 'eureka'
+include 'flex'
+include 'gateway'
+
+project(':auth').name = 'auth'
+project(':eureka').name = 'eureka'
+project(':flex').name = 'flex'
+project(':gateway').name = 'gateway'

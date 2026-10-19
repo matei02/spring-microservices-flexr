@@ -1,0 +1,110 @@
+############################
+#  FLEXR ─ FRONTEND CI/CD  #
+############################
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+variables:
+  CLOUDSDK_CORE_PROJECT: "woven-justice-453608-r8"
+  REGISTRY: "europe-west1-docker.pkg.dev/woven-justice-453608-r8/flexr-repo"
+  DOCKER_HOST: "tcp://docker:2375/"
+  DOCKER_TLS_CERTDIR: ""
+  # NODE_ENV: "production"
+
+stages:
+  - test
+  - build
+  - dockerize
+  - deploy
+
+# Include security scanning templates
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+# --------------------------------------------------------------------
+# Base template: Docker-in-Docker + gcloud auth
+# --------------------------------------------------------------------
+.gcloud-job:
+  image: google/cloud-sdk:latest
+  services:
+    - docker:dind
+  before_script:
+    - gcloud auth activate-service-account --key-file="$GCLOUD_SERVICE_KEY"
+    - gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
+
+# --------------------------------------------------------------------
+# Test Stage
+# --------------------------------------------------------------------
+test:
+  stage: test
+  image: node:20
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .npm/
+      - node_modules/
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+    # - npm install -g eslint@8.57.0 eslint-config-next@13.4.19
+    - npm install --save-dev eslint
+  script:
+    - npm run lint
+    - npm run test --if-present
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+
+# --------------------------------------------------------------------
+# Build Stage
+# --------------------------------------------------------------------
+build:
+  stage: build
+  image: node:20-alpine
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .npm/
+  variables:
+    NEXT_PUBLIC_API_URL: "https://flexr-gateway-000000000000.europe-west1.run.app"
+    NEXT_PUBLIC_AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+    NEXT_PUBLIC_AUTH0_CLIENT_ID:change-me-to-a-long-random-secret-of-at-least-32-bytes
+    # NEXT_PUBLIC_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run build
+  artifacts:
+    paths:
+      - .next/
+      - public/
+      - package.json
+      - next.config.mjs
+    expire_in: 1 day
+
+# --------------------------------------------------------------------
+# Dockerize Stage
+# --------------------------------------------------------------------
+dockerize:
+  extends: .gcloud-job
+  stage: dockerize
+  needs: [build]
+  script:
+    - docker build -t "$REGISTRY/frontend:$CI_COMMIT_SHA" .
+    - docker push "$REGISTRY/frontend:$CI_COMMIT_SHA"
+
+# --------------------------------------------------------------------
+# Deploy Stage
+# --------------------------------------------------------------------
+deploy:
+  extends: .gcloud-job
+  stage: deploy
+  needs: [dockerize]
+  script: |
+    gcloud run deploy flexr-frontend \
+      --image $REGISTRY/frontend:$CI_COMMIT_SHA \
+      --region europe-west1 \
+      --platform managed \
+      --port 3000 \
+      --allow-unauthenticated \
+      --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_API_URL=https://flexr-gateway-000000000000.europe-west1.run.app"

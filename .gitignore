@@ -1,0 +1,24 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+cypress.env.json
+*.pem
+*.key
+*key*.json
+*service_account*.json
+
+# Backend (Gradle / IDE)
+backend/**/build/
+backend/**/.gradle/
+.idea/
+*.iml
+
+# Frontend (Node / Next.js)
+node_modules/
+frontend/.next/
+frontend/out/
+
+# OS / editor
+.DS_Store
+Thumbs.db

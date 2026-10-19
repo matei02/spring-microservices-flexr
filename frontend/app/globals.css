@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0 0;
+  --foreground: 255 255 255;
+  --primary: 37 99 235;
+  --secondary: 209 213 219;
+  --navbar-footer-bg: 36 36 40; /* brighter gray for navbar/footer */
+  --card-border: 63 63 70; /* brighter border for cards */
+  --card-shadow: 0 4px 16px 0 rgba(0,0,0,0.14);
+}
+
+html, body {
+  height: 100%;
+  background-color: #000000;
+}
+
+body {
+  background-color: #000000;
+  color: rgb(var(--foreground));
+}
+
+/* Component Classes */
+.btn-primary {
+  background-color: rgb(var(--primary));
+  color: rgb(var(--foreground));
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: rgb(var(--primary) / 0.9);
+}
+
+.btn-secondary {
+  background-color: rgb(var(--secondary) / 0.1);
+  color: rgb(var(--secondary));
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: rgb(var(--secondary) / 0.2);
+}
+
+/* Navbar & Footer distinct background */
+.navbar, .footer {
+  background-color: rgb(var(--navbar-footer-bg));
+  border-color: rgb(var(--card-border));
+  box-shadow: 0 4px 16px 0 rgba(0,0,0,0.20);
+}
+
+/* Card improvements */
+.card {
+  border: 2px solid rgb(var(--card-border));
+  border-radius: 1.25rem;
+  box-shadow: var(--card-shadow);
+  background: #232329;
+}
+
+/* Add outline to avatars */
+.avatar-outline {
+  outline: 3px solid rgb(var(--card-border));
+  outline-offset: 2px;
+  border-radius: 9999px;
+}
+
+/* Button improvements */
+.btn-primary, .btn-secondary {
+  border-radius: 0.75rem;
+  border: 2px solid rgb(var(--card-border));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
