@@ -4,7 +4,7 @@ FlexR is a social app for sharing achievements ("flexes"): posts, likes and comm
 
 ![Demo: the Eureka registry with the three services registered, then real requests: the gateway rejects calls without a token, the flex service stores and lists posts](docs/demo.gif)
 
-> Recorded on my machine with all four backend services running unchanged against a local PostgreSQL. The frontend needs an Auth0 tenant to log in, so it is not in the GIF (see "How to run it").
+> All four backend services running locally against PostgreSQL, code unchanged. The frontend needs an Auth0 tenant to log in, so it is not in the GIF (see "How to run it").
 
 Individual project from my sixth semester (Feb to Jun 2025).
 
@@ -72,7 +72,7 @@ cp .env.example .env.local   # fill in the Auth0 values
 npm install && npm run dev   # http://localhost:3000
 ```
 
-The gateway's Auth0 issuer is a placeholder in `gateway/src/main/resources/application.yml`; set it to your tenant. I ran the backend exactly like this (environment variables only, no code changes) for the GIF.
+The gateway's Auth0 issuer is a placeholder in `gateway/src/main/resources/application.yml`; set it to your tenant. The GIF was recorded this way: environment variables only, no code changes.
 
 ## My contribution
 
@@ -86,7 +86,7 @@ Individual project: I built all of it. The original backend repository has 84 co
 - There is no database schema or migration in the repo: the tables were created in the cloud database. Locally, `SPRING_JPA_HIBERNATE_DDL_AUTO=update` creates them.
 - In the configuration both services connect to a database named `postgres`; a real "database per service" setup would separate them.
 - The services trust the `x-user-*` headers, so they must only be reachable through the gateway; when you run them locally (as in the GIF) anyone can call them directly.
-- **Tests:** 46 backend tests. When I ran them locally, 43 passed; the 3 that failed (`contextLoads` in auth and flex, one flex integration test) need a database configured for the test run.
+- **Tests:** 46 backend tests. 43 pass; 3 (`contextLoads` in auth and flex, one flex integration test) need a database configured for the test run.
 - The Cypress test needs a real Auth0 test user (`cypress.env.example.json`).
 
 ## What I would change for production
