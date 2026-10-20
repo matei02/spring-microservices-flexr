@@ -78,7 +78,7 @@ The gateway's Auth0 issuer is a placeholder in `gateway/src/main/resources/appli
 
 Individual project: I built all of it. The original backend repository has 84 commits, all mine (Feb to Jun 2025). This repository starts with a fresh history.
 
-**About this repository:** the code is mine and is shown as it was in June 2025. I packaged it for GitHub (this README, screenshots, demo GIF, removing secrets) with help from an AI assistant, which is why the single commit lists Claude as co-author.
+**About this repository:** the code is mine and has not been changed since June 2025. I packaged it for GitHub (this README, screenshots, demo GIF, removing secrets) with help from an AI assistant, which is why the single commit lists Claude as co-author.
 
 ## Status and limitations
 
